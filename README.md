@@ -19,18 +19,3 @@
     "vite": "^5.4.11"
   }
 }
-NF Sales Dashboard
-Internal sales KPI dashboard for the Nightforce Central territory. Tracks shipped/
-unshipped scope and optics sales across product families (ATACR, NX8, NX6, SHV, NXS, NF).
-Stack
-React 18 + Chart.js, built with Vite (no runtime transpilation, all dependencies bundled)
-Password gate via serverless function (`/api/auth`)
-Data sourced from Google Sheets
-Deploy (Vercel)
-Push this repo to GitHub.
-Import into Vercel. Framework preset auto-detects as Vite.
-Set environment variable `DASHBOARD_PASSWORD` in Vercel project settings.
-Vercel runs `npm install && npm run build` and serves `dist/`.
-Local note
-Source lives in `src/`. Edit `src/App.jsx` for app logic, `src/index.css` for styles.
-Vercel builds on every push to `main` — no local build step required.
