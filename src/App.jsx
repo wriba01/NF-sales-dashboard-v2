@@ -5,6 +5,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
+import * as XLSX from 'xlsx';
 
 
         // Register chartjs-plugin-datalabels but disable by default
@@ -718,6 +719,11 @@ import ChartDataLabels from 'chartjs-plugin-datalabels';
             const [loading, setLoading] = useState(false);
             const [error, setError] = useState(null);
             const [currentPage, setCurrentPage] = useState('dashboard'); // 'dashboard', 'metrics', 'reps', 'buygroup', 'productdeepdive', or 'openorders'
+            // Open Order Report sub-layer (inside Open Orders tab)
+            const [ooView, setOoView] = useState('summary'); // 'summary' | 'report'
+            const [ooMode, setOoMode] = useState('rep');     // 'rep' | 'dealer'
+            const [ooRep, setOoRep] = useState('');
+            const [ooDealer, setOoDealer] = useState('');
             
             // All Optics section filters (Product Deep Dive page only)
             const [allOpticsTopN, setAllOpticsTopN] = useState(50); // 50 or 100
@@ -787,6 +793,49 @@ import ChartDataLabels from 'chartjs-plugin-datalabels';
 
             const handlePrint = () => {
                 window.print();
+            };
+
+            // === Open Order Report: build rows from the already-loaded Unshipped data ===
+            // Line identity = Dealer + SKU + Scheduled Ship Date. Qty sums ONLY within an
+            // identical triple; a different delivery date is always a separate line.
+            const buildOpenOrderReport = (data, mode, selection) => {
+                const field = mode === 'rep' ? 'hgSalesRep' : 'customer';
+                const subset = data.filter(r => (r[field] || '') === selection);
+                const map = new Map();
+                for (const r of subset) {
+                    const dealer = r.customer || '';
+                    const sku = r.item || '';
+                    const date = r.scheduledShipDate || '';
+                    const k = dealer + '||' + sku + '||' + date;
+                    if (!map.has(k)) {
+                        map.set(k, { dealer, location: r.shipToLocation || '', sku, description: r.description || '', qty: 0, deliveryDate: date });
+                    }
+                    map.get(k).qty += (Number(r.qty) || 0);
+                }
+                const rows = [...map.values()].sort((a, b) =>
+                    a.dealer.localeCompare(b.dealer) || a.sku.localeCompare(b.sku) || a.deliveryDate.localeCompare(b.deliveryDate));
+                const dealers = new Set(rows.map(r => r.dealer));
+                const units = rows.reduce((sum, r) => sum + r.qty, 0);
+                return { rows, totals: { dealers: dealers.size, lines: rows.length, units } };
+            };
+
+            const exportOpenOrderXLSX = () => {
+                const sel = ooMode === 'rep' ? ooRep : ooDealer;
+                if (!sel) return;
+                const { rows, totals } = buildOpenOrderReport(unshippedData, ooMode, sel);
+                const aoa = [
+                    ['Open Order Report \u2014 ' + (ooMode === 'rep' ? 'Rep' : 'Dealer') + ': ' + sel],
+                    [totals.dealers + ' dealers \u00b7 ' + totals.lines + ' order lines \u00b7 ' + totals.units + ' units'],
+                    [],
+                    ['Dealer', 'Location', 'SKU', 'Description', 'Qty', 'Est. Delivery'],
+                    ...rows.map(r => [r.dealer, r.location, r.sku, r.description, r.qty, r.deliveryDate]),
+                ];
+                const ws = XLSX.utils.aoa_to_sheet(aoa);
+                ws['!cols'] = [{ wch: 34 }, { wch: 18 }, { wch: 10 }, { wch: 48 }, { wch: 6 }, { wch: 14 }];
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Open Orders');
+                const safe = sel.replace(/[^a-z0-9]+/gi, '_').slice(0, 40);
+                XLSX.writeFile(wb, 'Open_Orders_' + safe + '.xlsx');
             };
 
             const loadDataFromGoogleSheets = async () => {
@@ -4565,6 +4614,13 @@ const top20Accessories = useMemo(() => {
                         {/* Open Orders Report Page */}
                         {unshippedData.length > 0 && currentPage === 'openorders' && (
                             <>
+                                {/* === Open Orders sub-navigation === */}
+                                <div className="no-print" style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                                    <button onClick={() => setOoView('summary')} style={{ padding: '10px 18px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: ooView === 'summary' ? '#23668b' : '#ccc', color: ooView === 'summary' ? '#fff' : '#333' }}>Unshipped Summary</button>
+                                    <button onClick={() => setOoView('report')} style={{ padding: '10px 18px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: ooView === 'report' ? '#23668b' : '#ccc', color: ooView === 'report' ? '#fff' : '#333' }}>Open Order Report</button>
+                                </div>
+
+                                {ooView === 'summary' && (<>
                                 {/* Filters for Open Orders */}
                                 <div className="no-print" style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: '1px solid #ddd' }}>
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '15px' }}>
@@ -4873,6 +4929,81 @@ const top20Accessories = useMemo(() => {
                                         </>
                                     );
                                 })()}
+                                </>)}
+
+                                {ooView === 'report' && (
+                                    <>
+                                        {/* Report controls */}
+                                        <div className="no-print" style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: '1px solid #ddd', display: 'flex', flexWrap: 'wrap', gap: '18px', alignItems: 'flex-end' }}>
+                                            <div>
+                                                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px', color: '#333' }}>Report By:</label>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <button onClick={() => setOoMode('rep')} style={{ padding: '8px 16px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: ooMode === 'rep' ? '#23668b' : '#ddd', color: ooMode === 'rep' ? '#fff' : '#333' }}>Rep</button>
+                                                    <button onClick={() => setOoMode('dealer')} style={{ padding: '8px 16px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: ooMode === 'dealer' ? '#23668b' : '#ddd', color: ooMode === 'dealer' ? '#fff' : '#333' }}>Dealer</button>
+                                                </div>
+                                            </div>
+                                            <div style={{ minWidth: '280px', flex: '1 1 280px' }}>
+                                                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px', color: '#333' }}>{ooMode === 'rep' ? 'H&G Rep:' : 'Dealer:'}</label>
+                                                <select value={ooMode === 'rep' ? ooRep : ooDealer} onChange={(e) => ooMode === 'rep' ? setOoRep(e.target.value) : setOoDealer(e.target.value)} style={{ width: '100%', padding: '8px', border: '1px solid #ccc', backgroundColor: '#fff', color: '#333', borderRadius: '4px' }}>
+                                                    <option value="">{ooMode === 'rep' ? 'Select a rep\u2026' : 'Select a dealer\u2026'}</option>
+                                                    {(() => {
+                                                        const field = ooMode === 'rep' ? 'hgSalesRep' : 'customer';
+                                                        const opts = [...new Set(unshippedData.map(r => r[field]).filter(Boolean))].sort();
+                                                        return opts.map(o => <option key={o} value={o}>{o}</option>);
+                                                    })()}
+                                                </select>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: '10px' }}>
+                                                <button onClick={handlePrint} style={{ padding: '10px 18px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: '#555', color: '#fff' }}>Print</button>
+                                                <button onClick={exportOpenOrderXLSX} style={{ padding: '10px 18px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: '#1a7a3c', color: '#fff' }}>Download Excel</button>
+                                            </div>
+                                        </div>
+
+                                        {/* Report output */}
+                                        {(() => {
+                                            const sel = ooMode === 'rep' ? ooRep : ooDealer;
+                                            if (!sel) {
+                                                return <div style={{ padding: '40px', textAlign: 'center', color: '#888', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #ddd' }}>Select a {ooMode === 'rep' ? 'rep' : 'dealer'} to generate the open order report.</div>;
+                                            }
+                                            const { rows, totals } = buildOpenOrderReport(unshippedData, ooMode, sel);
+                                            if (rows.length === 0) {
+                                                return <div style={{ padding: '40px', textAlign: 'center', color: '#888', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #ddd' }}>No open orders found for {sel}.</div>;
+                                            }
+                                            const th = { padding: '8px 10px', textAlign: 'left', fontSize: '13px' };
+                                            const td = { padding: '6px 10px', fontSize: '13px', borderBottom: '1px solid #eee', verticalAlign: 'top' };
+                                            return (
+                                                <div style={{ backgroundColor: '#fff', padding: '24px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: '1px solid #ddd' }}>
+                                                    <h2 style={{ margin: '0 0 4px', color: '#23668b' }}>Open Order Report {'\u2014'} {ooMode === 'rep' ? 'Rep' : 'Dealer'}: {sel}</h2>
+                                                    <div style={{ color: '#555', marginBottom: '18px', fontWeight: 'bold' }}>{totals.dealers} dealers {'\u00b7'} {totals.lines} order lines {'\u00b7'} {totals.units} units</div>
+                                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                                        <thead>
+                                                            <tr style={{ backgroundColor: '#23668b', color: '#fff' }}>
+                                                                <th style={th}>Dealer</th>
+                                                                <th style={th}>Location</th>
+                                                                <th style={th}>SKU</th>
+                                                                <th style={th}>Description</th>
+                                                                <th style={{ ...th, textAlign: 'right' }}>Qty</th>
+                                                                <th style={th}>Est. Delivery</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {rows.map((r, i) => (
+                                                                <tr key={i} style={{ backgroundColor: i % 2 ? '#f9f9f9' : '#fff' }}>
+                                                                    <td style={td}>{r.dealer}</td>
+                                                                    <td style={td}>{r.location}</td>
+                                                                    <td style={td}>{r.sku}</td>
+                                                                    <td style={td}>{r.description}</td>
+                                                                    <td style={{ ...td, textAlign: 'right' }}>{r.qty}</td>
+                                                                    <td style={td}>{r.deliveryDate}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            );
+                                        })()}
+                                    </>
+                                )}
                             </>
                         )}
                     </div>
