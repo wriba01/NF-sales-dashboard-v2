@@ -4278,11 +4278,11 @@ const top20Accessories = useMemo(() => {
                                             [familyLabel + ' - Top 20'],
                                             [rows.length + ' products'],
                                             [],
-                                            ['Rank', 'National Rank', 'Item', 'Description', 'Qty', 'Customers', 'Repeat %'],
-                                            ...rows.map((p, i) => [i + 1, p.nationalRank ? ('#' + p.nationalRank) : 'N/A', p.item, p.description, p.qty, p.customers, p.repeatRate.toFixed(0) + '%']),
+                                            ['Rank', 'National Rank', 'Item', 'Description'],
+                                            ...rows.map((p, i) => [i + 1, p.nationalRank ? ('#' + p.nationalRank) : 'N/A', p.item, p.description]),
                                         ];
                                         const ws = XLSX.utils.aoa_to_sheet(aoa);
-                                        ws['!cols'] = [{ wch: 6 }, { wch: 14 }, { wch: 14 }, { wch: 40 }, { wch: 10 }, { wch: 12 }, { wch: 10 }];
+                                        ws['!cols'] = [{ wch: 6 }, { wch: 14 }, { wch: 14 }, { wch: 50 }];
                                         const wb = XLSX.utils.book_new();
                                         XLSX.utils.book_append_sheet(wb, ws, familyLabel.replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 31));
                                         const safe = familyLabel.replace(/[^a-z0-9]+/gi, '_').slice(0, 40);
@@ -4406,9 +4406,9 @@ const top20Accessories = useMemo(() => {
                                                                 <th style={{ padding: '10px', textAlign: 'center', borderBottom: '2px solid #23668b', color: '#333' }}>National Rank</th>
                                                                 <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #23668b', color: '#333' }}>Item</th>
                                                                 <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #23668b', color: '#333' }}>Description</th>
-                                                                <th style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Qty</th>
-                                                                <th style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Customers</th>
-                                                                <th style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Repeat %</th>
+                                                                <th className="no-print" style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Qty</th>
+                                                                <th className="no-print" style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Customers</th>
+                                                                <th className="no-print" style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Repeat %</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
@@ -4427,9 +4427,9 @@ const top20Accessories = useMemo(() => {
                                                                         </td>
                                                                         <td style={{ padding: '10px', color: '#333', fontWeight: 'bold' }}>{product.item}</td>
                                                                         <td style={{ padding: '10px', color: '#666' }}>{product.description}</td>
-                                                                        <td style={{ padding: '10px', color: '#333', textAlign: 'right', fontWeight: 'bold' }}>{product.qty.toLocaleString()}</td>
-                                                                        <td style={{ padding: '10px', color: '#333', textAlign: 'right' }}>{product.customers}</td>
-                                                                        <td style={{ padding: '10px', color: '#23668b', textAlign: 'right', fontWeight: 'bold' }}>{product.repeatRate.toFixed(0)}%</td>
+                                                                        <td className="no-print" style={{ padding: '10px', color: '#333', textAlign: 'right', fontWeight: 'bold' }}>{product.qty.toLocaleString()}</td>
+                                                                        <td className="no-print" style={{ padding: '10px', color: '#333', textAlign: 'right' }}>{product.customers}</td>
+                                                                        <td className="no-print" style={{ padding: '10px', color: '#23668b', textAlign: 'right', fontWeight: 'bold' }}>{product.repeatRate.toFixed(0)}%</td>
                                                                     </tr>
                                                                 ))
                                                             )}
@@ -4455,9 +4455,9 @@ const top20Accessories = useMemo(() => {
                                                                 <th style={{ padding: '10px', textAlign: 'center', borderBottom: '2px solid #23668b', color: '#333' }}>National Rank</th>
                                                                 <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #23668b', color: '#333' }}>Item</th>
                                                                 <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #23668b', color: '#333' }}>Description</th>
-                                                                <th style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Qty</th>
-                                                                <th style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Customers</th>
-                                                                <th style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Repeat %</th>
+                                                                <th className="no-print" style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Qty</th>
+                                                                <th className="no-print" style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Customers</th>
+                                                                <th className="no-print" style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Repeat %</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
@@ -4476,9 +4476,9 @@ const top20Accessories = useMemo(() => {
                                                                         </td>
                                                                         <td style={{ padding: '10px', color: '#333', fontWeight: 'bold' }}>{product.item}</td>
                                                                         <td style={{ padding: '10px', color: '#666' }}>{product.description}</td>
-                                                                        <td style={{ padding: '10px', color: '#333', textAlign: 'right', fontWeight: 'bold' }}>{product.qty.toLocaleString()}</td>
-                                                                        <td style={{ padding: '10px', color: '#333', textAlign: 'right' }}>{product.customers}</td>
-                                                                        <td style={{ padding: '10px', color: '#23668b', textAlign: 'right', fontWeight: 'bold' }}>{product.repeatRate.toFixed(0)}%</td>
+                                                                        <td className="no-print" style={{ padding: '10px', color: '#333', textAlign: 'right', fontWeight: 'bold' }}>{product.qty.toLocaleString()}</td>
+                                                                        <td className="no-print" style={{ padding: '10px', color: '#333', textAlign: 'right' }}>{product.customers}</td>
+                                                                        <td className="no-print" style={{ padding: '10px', color: '#23668b', textAlign: 'right', fontWeight: 'bold' }}>{product.repeatRate.toFixed(0)}%</td>
                                                                     </tr>
                                                                 ))
                                                             )}
@@ -4504,9 +4504,9 @@ const top20Accessories = useMemo(() => {
                                                                 <th style={{ padding: '10px', textAlign: 'center', borderBottom: '2px solid #23668b', color: '#333' }}>National Rank</th>
                                                                 <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #23668b', color: '#333' }}>Item</th>
                                                                 <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #23668b', color: '#333' }}>Description</th>
-                                                                <th style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Qty</th>
-                                                                <th style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Customers</th>
-                                                                <th style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Repeat %</th>
+                                                                <th className="no-print" style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Qty</th>
+                                                                <th className="no-print" style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Customers</th>
+                                                                <th className="no-print" style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Repeat %</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
@@ -4525,9 +4525,9 @@ const top20Accessories = useMemo(() => {
                                                                         </td>
                                                                         <td style={{ padding: '10px', color: '#333', fontWeight: 'bold' }}>{product.item}</td>
                                                                         <td style={{ padding: '10px', color: '#666' }}>{product.description}</td>
-                                                                        <td style={{ padding: '10px', color: '#333', textAlign: 'right', fontWeight: 'bold' }}>{product.qty.toLocaleString()}</td>
-                                                                        <td style={{ padding: '10px', color: '#333', textAlign: 'right' }}>{product.customers}</td>
-                                                                        <td style={{ padding: '10px', color: '#23668b', textAlign: 'right', fontWeight: 'bold' }}>{product.repeatRate.toFixed(0)}%</td>
+                                                                        <td className="no-print" style={{ padding: '10px', color: '#333', textAlign: 'right', fontWeight: 'bold' }}>{product.qty.toLocaleString()}</td>
+                                                                        <td className="no-print" style={{ padding: '10px', color: '#333', textAlign: 'right' }}>{product.customers}</td>
+                                                                        <td className="no-print" style={{ padding: '10px', color: '#23668b', textAlign: 'right', fontWeight: 'bold' }}>{product.repeatRate.toFixed(0)}%</td>
                                                                     </tr>
                                                                 ))
                                                             )}
@@ -4553,9 +4553,9 @@ const top20Accessories = useMemo(() => {
                                                                 <th style={{ padding: '10px', textAlign: 'center', borderBottom: '2px solid #23668b', color: '#333' }}>National Rank</th>
                                                                 <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #23668b', color: '#333' }}>Item</th>
                                                                 <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #23668b', color: '#333' }}>Description</th>
-                                                                <th style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Qty</th>
-                                                                <th style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Customers</th>
-                                                                <th style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Repeat %</th>
+                                                                <th className="no-print" style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Qty</th>
+                                                                <th className="no-print" style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Customers</th>
+                                                                <th className="no-print" style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Repeat %</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
@@ -4574,9 +4574,9 @@ const top20Accessories = useMemo(() => {
                                                                         </td>
                                                                         <td style={{ padding: '10px', color: '#333', fontWeight: 'bold' }}>{product.item}</td>
                                                                         <td style={{ padding: '10px', color: '#666' }}>{product.description}</td>
-                                                                        <td style={{ padding: '10px', color: '#333', textAlign: 'right', fontWeight: 'bold' }}>{product.qty.toLocaleString()}</td>
-                                                                        <td style={{ padding: '10px', color: '#333', textAlign: 'right' }}>{product.customers}</td>
-                                                                        <td style={{ padding: '10px', color: '#23668b', textAlign: 'right', fontWeight: 'bold' }}>{product.repeatRate.toFixed(0)}%</td>
+                                                                        <td className="no-print" style={{ padding: '10px', color: '#333', textAlign: 'right', fontWeight: 'bold' }}>{product.qty.toLocaleString()}</td>
+                                                                        <td className="no-print" style={{ padding: '10px', color: '#333', textAlign: 'right' }}>{product.customers}</td>
+                                                                        <td className="no-print" style={{ padding: '10px', color: '#23668b', textAlign: 'right', fontWeight: 'bold' }}>{product.repeatRate.toFixed(0)}%</td>
                                                                     </tr>
                                                                 ))
                                                             )}
@@ -4602,9 +4602,9 @@ const top20Accessories = useMemo(() => {
                                                                 <th style={{ padding: '10px', textAlign: 'center', borderBottom: '2px solid #23668b', color: '#333' }}>National Rank</th>
                                                                 <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #23668b', color: '#333' }}>Item</th>
                                                                 <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #23668b', color: '#333' }}>Description</th>
-                                                                <th style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Qty</th>
-                                                                <th style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Customers</th>
-                                                                <th style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Repeat %</th>
+                                                                <th className="no-print" style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Qty</th>
+                                                                <th className="no-print" style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Customers</th>
+                                                                <th className="no-print" style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Repeat %</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
@@ -4623,9 +4623,9 @@ const top20Accessories = useMemo(() => {
                                                                         </td>
                                                                         <td style={{ padding: '10px', color: '#333', fontWeight: 'bold' }}>{product.item}</td>
                                                                         <td style={{ padding: '10px', color: '#666' }}>{product.description}</td>
-                                                                        <td style={{ padding: '10px', color: '#333', textAlign: 'right', fontWeight: 'bold' }}>{product.qty.toLocaleString()}</td>
-                                                                        <td style={{ padding: '10px', color: '#333', textAlign: 'right' }}>{product.customers}</td>
-                                                                        <td style={{ padding: '10px', color: '#23668b', textAlign: 'right', fontWeight: 'bold' }}>{product.repeatRate.toFixed(0)}%</td>
+                                                                        <td className="no-print" style={{ padding: '10px', color: '#333', textAlign: 'right', fontWeight: 'bold' }}>{product.qty.toLocaleString()}</td>
+                                                                        <td className="no-print" style={{ padding: '10px', color: '#333', textAlign: 'right' }}>{product.customers}</td>
+                                                                        <td className="no-print" style={{ padding: '10px', color: '#23668b', textAlign: 'right', fontWeight: 'bold' }}>{product.repeatRate.toFixed(0)}%</td>
                                                                     </tr>
                                                                 ))
                                                             )}
@@ -4651,9 +4651,9 @@ const top20Accessories = useMemo(() => {
                                                                 <th style={{ padding: '10px', textAlign: 'center', borderBottom: '2px solid #23668b', color: '#333' }}>National Rank</th>
                                                                 <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #23668b', color: '#333' }}>Item</th>
                                                                 <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #23668b', color: '#333' }}>Description</th>
-                                                                <th style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Qty</th>
-                                                                <th style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Customers</th>
-                                                                <th style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Repeat %</th>
+                                                                <th className="no-print" style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Qty</th>
+                                                                <th className="no-print" style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Customers</th>
+                                                                <th className="no-print" style={{ padding: '10px', textAlign: 'right', borderBottom: '2px solid #23668b', color: '#333' }}>Repeat %</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
@@ -4672,9 +4672,9 @@ const top20Accessories = useMemo(() => {
                                                                         </td>
                                                                         <td style={{ padding: '10px', color: '#333', fontWeight: 'bold' }}>{product.item}</td>
                                                                         <td style={{ padding: '10px', color: '#666' }}>{product.description}</td>
-                                                                        <td style={{ padding: '10px', color: '#333', textAlign: 'right', fontWeight: 'bold' }}>{product.qty.toLocaleString()}</td>
-                                                                        <td style={{ padding: '10px', color: '#333', textAlign: 'right' }}>{product.customers}</td>
-                                                                        <td style={{ padding: '10px', color: '#23668b', textAlign: 'right', fontWeight: 'bold' }}>{product.repeatRate.toFixed(0)}%</td>
+                                                                        <td className="no-print" style={{ padding: '10px', color: '#333', textAlign: 'right', fontWeight: 'bold' }}>{product.qty.toLocaleString()}</td>
+                                                                        <td className="no-print" style={{ padding: '10px', color: '#333', textAlign: 'right' }}>{product.customers}</td>
+                                                                        <td className="no-print" style={{ padding: '10px', color: '#23668b', textAlign: 'right', fontWeight: 'bold' }}>{product.repeatRate.toFixed(0)}%</td>
                                                                     </tr>
                                                                 ))
                                                             )}
