@@ -25,39 +25,6 @@ import * as XLSX from 'xlsx';
         // Professional color scheme designed by William A Riba (WAR) for NFO Sales Analytics
         const COLORS = ['#23668b', '#238b48', '#8b6623', '#8b2366', '#668b23', '#66238b', '#8b4823', '#48238b'];
 
-        // === Fiscal Year support ===
-        // Nightforce's fiscal year runs July 1 - June 30, and is labeled by the
-        // calendar year it ENDS in (e.g. Jul 2025-Jun 2026 = "FY26"). Since the
-        // ending-year label is a plain integer, all existing "year - 1 = previous
-        // year" arithmetic elsewhere in this file keeps working unchanged in
-        // fiscal mode — only the extraction of "which year does this date belong
-        // to" needs to change.
-        const FISCAL_START_MONTH = 6; // July, 0-indexed
-
-        function getFiscalYear(date) {
-            const m = date.getMonth();
-            const y = date.getFullYear();
-            return m >= FISCAL_START_MONTH ? y + 1 : y;
-        }
-
-        // Returns the "period year" a date belongs to, given the active year mode.
-        function getPeriodYear(date, yearMode) {
-            return yearMode === 'fiscal' ? getFiscalYear(date) : date.getFullYear();
-        }
-
-        // Fiscal-relative month index: July = 0 ... June = 11. Used to sort the
-        // Monthly Trend chart's x-axis into fiscal order instead of Jan-Dec.
-        function getFiscalMonthIndex(calendarMonthIndex) {
-            return (calendarMonthIndex - FISCAL_START_MONTH + 12) % 12;
-        }
-
-        // Formats a period-year integer for display: "2026" in calendar mode,
-        // "FY26" in fiscal mode.
-        function formatPeriodLabel(year, yearMode) {
-            if (year === 'all') return 'All Years';
-            return yearMode === 'fiscal' ? `FY${String(year).slice(-2)}` : String(year);
-        }
-
 
         // CONFIGURATION
         // System designed and developed by William A Riba - 2025
@@ -140,7 +107,7 @@ import * as XLSX from 'xlsx';
             return <canvas ref={chartRef}></canvas>;
         });
 
-        const SimpleBarChart = React.memo(({ data, yearsWithData, yearMode }) => {
+        const SimpleBarChart = React.memo(({ data, yearsWithData }) => {
             const chartRef = useRef(null);
             const chartInstance = useRef(null);
 
@@ -155,7 +122,7 @@ import * as XLSX from 'xlsx';
 
                 // Only show datasets for years that have data
                 const datasets = yearsWithData.map((year, index) => ({
-                    label: formatPeriodLabel(year, yearMode),
+                    label: year.toString(),
                     data: data.map(item => item[year] || 0),
                     backgroundColor: COLORS[index % COLORS.length],
                     borderColor: COLORS[index % COLORS.length],
@@ -206,7 +173,7 @@ import * as XLSX from 'xlsx';
                         chartInstance.current.destroy();
                     }
                 };
-            }, [data, yearsWithData, yearMode]);
+            }, [data, yearsWithData]);
 
             return <canvas ref={chartRef}></canvas>;
         });
@@ -285,7 +252,7 @@ import * as XLSX from 'xlsx';
             return <canvas ref={chartRef}></canvas>;
         });
 
-        const AnnualBarChart = React.memo(({ data, yearMode }) => {
+        const AnnualBarChart = React.memo(({ data }) => {
             const chartRef = useRef(null);
             const chartInstance = useRef(null);
 
@@ -301,7 +268,7 @@ import * as XLSX from 'xlsx';
                 chartInstance.current = new Chart(ctx, {
                     type: 'bar',
                     data: {
-                        labels: data.map(item => formatPeriodLabel(item.year, yearMode)),
+                        labels: data.map(item => item.year.toString()),
                         datasets: [{
                             label: 'Annual Revenue',
                             data: data.map(item => item.revenue),
@@ -366,7 +333,7 @@ import * as XLSX from 'xlsx';
                         chartInstance.current.destroy();
                     }
                 };
-            }, [data, yearMode]);
+            }, [data]);
 
             return <canvas ref={chartRef}></canvas>;
         });
@@ -745,7 +712,6 @@ import * as XLSX from 'xlsx';
             const [selectedAccountManager, setSelectedAccountManager] = useState('all');
             const [selectedHGRep, setSelectedHGRep] = useState('all');
             const [selectedYear, setSelectedYear] = useState('all');
-            const [yearMode, setYearMode] = useState('calendar'); // 'calendar' | 'fiscal' (Jul-Jun, labeled by ending year)
             const [selectedTerritory, setSelectedTerritory] = useState('all');
             const [selectedClassification, setSelectedClassification] = useState('all');
             const [selectedBuyGroup, setSelectedBuyGroup] = useState('all');
@@ -764,14 +730,6 @@ import * as XLSX from 'xlsx';
             const [allOpticsScopeFamily, setAllOpticsScopeFamily] = useState('all'); // 'all', 'ATACR', 'NX8', 'NX6', 'SHV', 'NXS', 'NF'
             const [hiddenQtrYears, setHiddenQtrYears] = useState(new Set()); // years toggled off in quarterly chart legend
             const [allOpticsDataSource, setAllOpticsDataSource] = useState('both'); // 'shipped', 'unshipped', 'both'
-
-            // Switching Calendar/Fiscal resets the specific Year selection back to
-            // "All Years" — a selected year number means a different date range in
-            // each mode, so carrying it over silently would filter on the wrong window.
-            const handleYearModeChange = (mode) => {
-                setYearMode(mode);
-                setSelectedYear('all');
-            };
 
             useEffect(() => {
                 const auth = sessionStorage.getItem('dashboard_auth');
@@ -1096,7 +1054,7 @@ import * as XLSX from 'xlsx';
                     const yearNum = parseInt(selectedYear);
                     data = data.filter(row => {
                         if (!row.shipDateParsed) return false;
-                        return getPeriodYear(row.shipDateParsed, yearMode) === yearNum;
+                        return row.shipDateParsed.getFullYear() === yearNum;
                     });
                 }
                 
@@ -1122,7 +1080,7 @@ import * as XLSX from 'xlsx';
                 }
                 
                 return data;
-            }, [rawData, selectedAccountManager, selectedHGRep, selectedTerritory, selectedYear, yearMode, selectedClassification, selectedBuyGroup, selectedCustomer]);
+            }, [rawData, selectedAccountManager, selectedHGRep, selectedTerritory, selectedYear, selectedClassification, selectedBuyGroup, selectedCustomer]);
 
             // Filtered data excluding Year filter (for Annual YoY chart)
             const filteredDataExcludingYear = useMemo(() => {
@@ -1294,11 +1252,11 @@ import * as XLSX from 'xlsx';
                 const unique = new Set();
                 rawData.forEach(row => {
                     if (row.shipDateParsed) {
-                        unique.add(getPeriodYear(row.shipDateParsed, yearMode));
+                        unique.add(row.shipDateParsed.getFullYear());
                     }
                 });
                 return ['all', ...Array.from(unique).sort((a, b) => b - a)]; // Sort descending
-            }, [rawData, yearMode]);
+            }, [rawData]);
 
             const territories = ['all', 'East', 'West', 'Central'];
             
@@ -1360,24 +1318,23 @@ import * as XLSX from 'xlsx';
 
             const monthlyYoYData = useMemo(() => {
                 const monthlyData = {};
-                const currentPeriodYear = getPeriodYear(new Date(), yearMode);
-                const startYear = currentPeriodYear - 5;
+                const currentYear = new Date().getFullYear();
+                const startYear = currentYear - 5;
 
                 filteredData.forEach(row => {
                     if (!row.shipDateParsed) return;
                     
                     const date = row.shipDateParsed;
-                    const year = getPeriodYear(date, yearMode);
+                    const year = date.getFullYear();
                     const month = date.getMonth();
 
-                    if (year < startYear || year > currentPeriodYear) return;
+                    if (year < startYear || year > currentYear) return;
 
                     const monthName = new Date(2000, month).toLocaleString('en-US', { month: 'short' });
-                    const sortIndex = yearMode === 'fiscal' ? getFiscalMonthIndex(month) : month;
                     
                     if (!monthlyData[monthName]) {
-                        monthlyData[monthName] = { month: monthName, monthIndex: sortIndex };
-                        for (let y = startYear; y <= currentPeriodYear; y++) {
+                        monthlyData[monthName] = { month: monthName, monthIndex: month };
+                        for (let y = startYear; y <= currentYear; y++) {
                             monthlyData[monthName][y] = 0;
                         }
                     }
@@ -1386,7 +1343,7 @@ import * as XLSX from 'xlsx';
                 });
 
                 return Object.values(monthlyData).sort((a, b) => a.monthIndex - b.monthIndex);
-            }, [filteredData, yearMode]);
+            }, [filteredData]);
 
             // Annual YoY data for simple year comparison (uses all filters EXCEPT year)
             const annualYoYData = useMemo(() => {
@@ -1395,7 +1352,7 @@ import * as XLSX from 'xlsx';
                 filteredDataExcludingYear.forEach(row => {
                     if (!row.shipDateParsed) return;
                     
-                    const year = getPeriodYear(row.shipDateParsed, yearMode);
+                    const year = row.shipDateParsed.getFullYear();
                     
                     if (!yearData[year]) {
                         yearData[year] = 0;
@@ -1408,18 +1365,18 @@ import * as XLSX from 'xlsx';
                 return Object.entries(yearData)
                     .map(([year, revenue]) => ({ year: parseInt(year), revenue }))
                     .sort((a, b) => a.year - b.year);
-            }, [filteredDataExcludingYear, yearMode]);
+            }, [filteredDataExcludingYear]);
 
             // Get only years that have actual data
             const yearsWithData = useMemo(() => {
                 const uniqueYears = new Set();
                 filteredData.forEach(row => {
                     if (row.shipDateParsed) {
-                        uniqueYears.add(getPeriodYear(row.shipDateParsed, yearMode));
+                        uniqueYears.add(row.shipDateParsed.getFullYear());
                     }
                 });
                 return Array.from(uniqueYears).sort();
-            }, [filteredData, yearMode]);
+            }, [filteredData]);
 
             const revenueByAccountManager = useMemo(() => {
                 const grouped = {};
@@ -1549,9 +1506,9 @@ import * as XLSX from 'xlsx';
                 const yearNum = parseInt(selectedYear);
                 return rawData.filter(row => {
                     if (!row.shipDateParsed) return false;
-                    return getPeriodYear(row.shipDateParsed, yearMode) === yearNum;
+                    return row.shipDateParsed.getFullYear() === yearNum;
                 });
-            }, [rawData, selectedYear, yearMode]);
+            }, [rawData, selectedYear]);
 
             // National Optics vs Accessories
             const nationalRevenueByProductType = useMemo(() => {
@@ -1703,7 +1660,7 @@ const top20Accessories = useMemo(() => {
                 
                 filteredData.forEach(row => {
                     if (!row.shipDateParsed) return;
-                    const year = getPeriodYear(row.shipDateParsed, yearMode);
+                    const year = row.shipDateParsed.getFullYear();
                     if (!yearlyRevenue[year]) {
                         yearlyRevenue[year] = 0;
                     }
@@ -1729,7 +1686,7 @@ const top20Accessories = useMemo(() => {
                 }
 
                 return growthData;
-            }, [filteredData, yearMode]);
+            }, [filteredData]);
 
             // Total Number of Accounts
             const totalAccounts = useMemo(() => {
@@ -1759,7 +1716,7 @@ const top20Accessories = useMemo(() => {
             const customerActivityStatus = useMemo(() => {
                 const customers = {};
                 const today = new Date();
-                const currentYear = getPeriodYear(new Date(), yearMode);
+                const currentYear = new Date().getFullYear();
                 
                 // Filter unshipped data with same filters as shipped (except year)
                 let filteredUnshippedForActivity = unshippedData;
@@ -1807,7 +1764,7 @@ const top20Accessories = useMemo(() => {
                     customers[customer].totalRevenue += row.revenue;
                     
                     // Track YTD revenue (current year only)
-                    if (row.shipDateParsed && getPeriodYear(row.shipDateParsed, yearMode) === currentYear) {
+                    if (row.shipDateParsed && row.shipDateParsed.getFullYear() === currentYear) {
                         customers[customer].ytdRevenue += row.revenue;
                     }
                     
@@ -1906,7 +1863,7 @@ const top20Accessories = useMemo(() => {
                     atRisk: { customers: atRisk, ...calcTotals(atRisk) },
                     inactive: { customers: inactive, ...calcTotals(inactive) }
                 };
-            }, [consolidatedMetrics, unshippedData, selectedAccountManager, selectedHGRep, selectedTerritory, selectedClassification, selectedBuyGroup, selectedCustomer, yearMode]);
+            }, [consolidatedMetrics, unshippedData, selectedAccountManager, selectedHGRep, selectedTerritory, selectedClassification, selectedBuyGroup, selectedCustomer]);
 
             // Customer Activity Distribution (for pie chart)
             const customerActivityDistribution = useMemo(() => {
@@ -2320,27 +2277,6 @@ const top20Accessories = useMemo(() => {
                                             </select>
                                         </div>
 
-                                        {/* Year Type Toggle */}
-                                        <div>
-                                            <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>
-                                                Year Type:
-                                            </label>
-                                            <div style={{ display: 'flex', gap: '8px' }}>
-                                                <button
-                                                    onClick={() => handleYearModeChange('calendar')}
-                                                    style={{ flex: 1, padding: '8px 12px', fontSize: '14px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: yearMode === 'calendar' ? '#23668b' : '#ddd', color: yearMode === 'calendar' ? '#fff' : '#333' }}
-                                                >
-                                                    Calendar
-                                                </button>
-                                                <button
-                                                    onClick={() => handleYearModeChange('fiscal')}
-                                                    style={{ flex: 1, padding: '8px 12px', fontSize: '14px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: yearMode === 'fiscal' ? '#23668b' : '#ddd', color: yearMode === 'fiscal' ? '#fff' : '#333' }}
-                                                >
-                                                    Fiscal (Jul-Jun)
-                                                </button>
-                                            </div>
-                                        </div>
-
                                         {/* Year Filter */}
                                         <div>
                                             <label style={{ fontWeight: 'bold', marginRight: '10px', display: 'block', marginBottom: '8px' }}>
@@ -2353,7 +2289,7 @@ const top20Accessories = useMemo(() => {
                                             >
                                                 {years.map(year => (
                                                     <option key={year} value={year}>
-                                                        {formatPeriodLabel(year, yearMode)}
+                                                        {year === 'all' ? 'All Years' : year}
                                                     </option>
                                                 ))}
                                             </select>
@@ -2425,14 +2361,14 @@ const top20Accessories = useMemo(() => {
                                 <div className="print-card" style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '30px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: '1px solid #ddd' }}>
                                     <h2 style={{ marginTop: 0, marginBottom: '20px' }}>Annual Shipped - Year Over Year</h2>
                                     <div className="chart-container">
-                                        <AnnualBarChart data={annualYoYData} yearMode={yearMode} />
+                                        <AnnualBarChart data={annualYoYData} />
                                     </div>
                                 </div>
 
                                 <div className="print-card" style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '30px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: '1px solid #ddd' }}>
                                     <h2 style={{ marginTop: 0, marginBottom: '20px' }}>Monthly Shipped Breakdown</h2>
                                     <div className="chart-container">
-                                        <SimpleBarChart data={monthlyYoYData} yearsWithData={yearsWithData} yearMode={yearMode} />
+                                        <SimpleBarChart data={monthlyYoYData} yearsWithData={yearsWithData} />
                                     </div>
                                 </div>
 
@@ -2749,28 +2685,6 @@ const top20Accessories = useMemo(() => {
                                                 ))}
                                             </select>
                                         </div>
-                                        {/* Year Type Toggle */}
-                                        <div>
-                                            <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>
-                                                Year Type:
-                                            </label>
-                                            <div style={{ display: 'flex', gap: '8px' }}>
-                                                <button
-                                                    onClick={() => handleYearModeChange('calendar')}
-                                                    style={{ flex: 1, padding: '8px 12px', fontSize: '14px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: yearMode === 'calendar' ? '#23668b' : '#ddd', color: yearMode === 'calendar' ? '#fff' : '#333' }}
-                                                >
-                                                    Calendar
-                                                </button>
-                                                <button
-                                                    onClick={() => handleYearModeChange('fiscal')}
-                                                    style={{ flex: 1, padding: '8px 12px', fontSize: '14px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: yearMode === 'fiscal' ? '#23668b' : '#ddd', color: yearMode === 'fiscal' ? '#fff' : '#333' }}
-                                                >
-                                                    Fiscal (Jul-Jun)
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {/* Year Filter */}
                                         <div>
                                             <label style={{ fontWeight: 'bold', marginRight: '10px', display: 'block', marginBottom: '8px' }}>
                                                 Year:
@@ -2782,7 +2696,7 @@ const top20Accessories = useMemo(() => {
                                             >
                                                 {years.map(year => (
                                                     <option key={year} value={year}>
-                                                        {formatPeriodLabel(year, yearMode)}
+                                                        {year === 'all' ? 'All Years' : year}
                                                     </option>
                                                 ))}
                                             </select>
@@ -3184,28 +3098,6 @@ const top20Accessories = useMemo(() => {
                                                 ))}
                                             </select>
                                         </div>
-                                        {/* Year Type Toggle */}
-                                        <div>
-                                            <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>
-                                                Year Type:
-                                            </label>
-                                            <div style={{ display: 'flex', gap: '8px' }}>
-                                                <button
-                                                    onClick={() => handleYearModeChange('calendar')}
-                                                    style={{ flex: 1, padding: '8px 12px', fontSize: '14px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: yearMode === 'calendar' ? '#23668b' : '#ddd', color: yearMode === 'calendar' ? '#fff' : '#333' }}
-                                                >
-                                                    Calendar
-                                                </button>
-                                                <button
-                                                    onClick={() => handleYearModeChange('fiscal')}
-                                                    style={{ flex: 1, padding: '8px 12px', fontSize: '14px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: yearMode === 'fiscal' ? '#23668b' : '#ddd', color: yearMode === 'fiscal' ? '#fff' : '#333' }}
-                                                >
-                                                    Fiscal (Jul-Jun)
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {/* Year Filter */}
                                         <div>
                                             <label style={{ fontWeight: 'bold', marginRight: '10px', display: 'block', marginBottom: '8px' }}>
                                                 Year:
@@ -3217,7 +3109,7 @@ const top20Accessories = useMemo(() => {
                                             >
                                                 {years.map(year => (
                                                     <option key={year} value={year}>
-                                                        {formatPeriodLabel(year, yearMode)}
+                                                        {year === 'all' ? 'All Years' : year}
                                                     </option>
                                                 ))}
                                             </select>
@@ -3402,28 +3294,6 @@ const top20Accessories = useMemo(() => {
                                                 ))}
                                             </select>
                                         </div>
-                                        {/* Year Type Toggle */}
-                                        <div>
-                                            <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>
-                                                Year Type:
-                                            </label>
-                                            <div style={{ display: 'flex', gap: '8px' }}>
-                                                <button
-                                                    onClick={() => handleYearModeChange('calendar')}
-                                                    style={{ flex: 1, padding: '8px 12px', fontSize: '14px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: yearMode === 'calendar' ? '#23668b' : '#ddd', color: yearMode === 'calendar' ? '#fff' : '#333' }}
-                                                >
-                                                    Calendar
-                                                </button>
-                                                <button
-                                                    onClick={() => handleYearModeChange('fiscal')}
-                                                    style={{ flex: 1, padding: '8px 12px', fontSize: '14px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: yearMode === 'fiscal' ? '#23668b' : '#ddd', color: yearMode === 'fiscal' ? '#fff' : '#333' }}
-                                                >
-                                                    Fiscal (Jul-Jun)
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {/* Year Filter */}
                                         <div>
                                             <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px', color: '#333' }}>
                                                 Year:
@@ -3435,7 +3305,7 @@ const top20Accessories = useMemo(() => {
                                             >
                                                 {years.map(year => (
                                                     <option key={year} value={year}>
-                                                        {formatPeriodLabel(year, yearMode)}
+                                                        {year === 'all' ? 'All Years' : year}
                                                     </option>
                                                 ))}
                                             </select>
@@ -3534,7 +3404,7 @@ const top20Accessories = useMemo(() => {
                                         filteredData.forEach(row => {
                                             if (!row.shipDateParsed) return;
                                             
-                                            const year = getPeriodYear(row.shipDateParsed, yearMode);
+                                            const year = row.shipDateParsed.getFullYear();
                                             const group = getBuyGroupLabel(row.buyGroup);
                                             
                                             // Skip Non-Buy Group if toggle is off
@@ -3574,7 +3444,7 @@ const top20Accessories = useMemo(() => {
                                         const currentYearData = {};
                                         const previousYearData = {};
                                         
-                                        const currentYear = selectedYear === 'all' ? getPeriodYear(new Date(), yearMode) : parseInt(selectedYear);
+                                        const currentYear = selectedYear === 'all' ? new Date().getFullYear() : parseInt(selectedYear);
                                         const previousYear = currentYear - 1;
                                         
                                         // Use rawData and manually apply all filters EXCEPT year
@@ -3588,7 +3458,7 @@ const top20Accessories = useMemo(() => {
                                             if (selectedClassification !== 'all' && row.classification !== selectedClassification) return;
                                             if (selectedCustomer !== 'all' && row.customer !== selectedCustomer) return;
                                             
-                                            const year = getPeriodYear(row.shipDateParsed, yearMode);
+                                            const year = row.shipDateParsed.getFullYear();
                                             const group = getBuyGroupLabel(row.buyGroup);
                                             
                                             // Apply Buy Group filter
@@ -3673,7 +3543,7 @@ const top20Accessories = useMemo(() => {
                                         if (selectedYear === 'all') {
                                             // Cumulative new accounts across all years
                                             const allNewAccounts = { NBS: new Set(), 'Sports Inc': new Set(), 'Non-Buy Group': new Set() };
-                                            const allYears = [...new Set(rawData.filter(r => r.shipDateParsed && matchesNonYearFilters(r)).map(r => getPeriodYear(r.shipDateParsed, yearMode)))].sort();
+                                            const allYears = [...new Set(rawData.filter(r => r.shipDateParsed && matchesNonYearFilters(r)).map(r => r.shipDateParsed.getFullYear()))].sort();
                                             
                                             allYears.forEach((year, index) => {
                                                 if (index === 0) return; // Skip first year
@@ -3684,7 +3554,7 @@ const top20Accessories = useMemo(() => {
                                                 
                                                 rawData.forEach(row => {
                                                     if (!row.shipDateParsed || !row.customer || !matchesNonYearFilters(row)) return;
-                                                    const rowYear = getPeriodYear(row.shipDateParsed, yearMode);
+                                                    const rowYear = row.shipDateParsed.getFullYear();
                                                     const group = getBuyGroupLabel(row.buyGroup);
                                                     
                                                     if (rowYear === year) {
@@ -3722,7 +3592,7 @@ const top20Accessories = useMemo(() => {
                                             
                                             rawData.forEach(row => {
                                                 if (!row.shipDateParsed || !row.customer || !matchesNonYearFilters(row)) return;
-                                                const rowYear = getPeriodYear(row.shipDateParsed, yearMode);
+                                                const rowYear = row.shipDateParsed.getFullYear();
                                                 const group = getBuyGroupLabel(row.buyGroup);
                                                 
                                                 if (rowYear === currentYear) {
@@ -3908,28 +3778,6 @@ const top20Accessories = useMemo(() => {
                                                 ))}
                                             </select>
                                         </div>
-                                        {/* Year Type Toggle */}
-                                        <div>
-                                            <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>
-                                                Year Type:
-                                            </label>
-                                            <div style={{ display: 'flex', gap: '8px' }}>
-                                                <button
-                                                    onClick={() => handleYearModeChange('calendar')}
-                                                    style={{ flex: 1, padding: '8px 12px', fontSize: '14px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: yearMode === 'calendar' ? '#23668b' : '#ddd', color: yearMode === 'calendar' ? '#fff' : '#333' }}
-                                                >
-                                                    Calendar
-                                                </button>
-                                                <button
-                                                    onClick={() => handleYearModeChange('fiscal')}
-                                                    style={{ flex: 1, padding: '8px 12px', fontSize: '14px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: yearMode === 'fiscal' ? '#23668b' : '#ddd', color: yearMode === 'fiscal' ? '#fff' : '#333' }}
-                                                >
-                                                    Fiscal (Jul-Jun)
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {/* Year Filter */}
                                         <div>
                                             <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px', color: '#333' }}>
                                                 Year:
@@ -3941,7 +3789,7 @@ const top20Accessories = useMemo(() => {
                                             >
                                                 {years.map(year => (
                                                     <option key={year} value={year}>
-                                                        {formatPeriodLabel(year, yearMode)}
+                                                        {year === 'all' ? 'All Years' : year}
                                                     </option>
                                                 ))}
                                             </select>
@@ -4171,7 +4019,7 @@ const top20Accessories = useMemo(() => {
                                                 const yearNum = parseInt(selectedYear);
                                                 filteredUnshipped = filteredUnshipped.filter(row => {
                                                     if (!row.scheduledShipDateParsed) return false;
-                                                    return getPeriodYear(row.scheduledShipDateParsed, yearMode) === yearNum;
+                                                    return row.scheduledShipDateParsed.getFullYear() === yearNum;
                                                 });
                                             }
                                             if (selectedClassification !== 'all') {
@@ -4242,7 +4090,7 @@ const top20Accessories = useMemo(() => {
                                             const yearNum = parseInt(selectedYear);
                                             nationalFilteredData = nationalFilteredData.filter(row => {
                                                 if (!row.shipDateParsed) return false;
-                                                return getPeriodYear(row.shipDateParsed, yearMode) === yearNum;
+                                                return row.shipDateParsed.getFullYear() === yearNum;
                                             });
                                         }
                                         
@@ -4301,7 +4149,7 @@ const top20Accessories = useMemo(() => {
                                         };
                                         
                                         // Get current year and previous year for YoY calculation
-                                        const allYears = [...new Set(rawData.filter(r => r.shipDateParsed).map(r => getPeriodYear(r.shipDateParsed, yearMode)))].sort();
+                                        const allYears = [...new Set(rawData.filter(r => r.shipDateParsed).map(r => r.shipDateParsed.getFullYear()))].sort();
                                         const latestYear = allYears[allYears.length - 1];
                                         const previousYear = latestYear - 1;
                                         
@@ -4347,7 +4195,7 @@ const top20Accessories = useMemo(() => {
                                             if (!family || !families[family][row.item]) return;
                                             
                                             if (!row.shipDateParsed) return;
-                                            const year = getPeriodYear(row.shipDateParsed, yearMode);
+                                            const year = row.shipDateParsed.getFullYear();
                                             
                                             if (year === latestYear) {
                                                 families[family][row.item].currentYearQty += row.qty;
@@ -4405,14 +4253,56 @@ const top20Accessories = useMemo(() => {
                                         return result;
                                     })();
 
+                                    // === Export: All Optics section to Excel ===
+                                    const exportAllOpticsXLSX = () => {
+                                        const sourceLabel = allOpticsDataSource === 'both' ? 'Shipped + Unshipped' : allOpticsDataSource === 'shipped' ? 'Shipped Only' : 'Unshipped Only';
+                                        const familyLabel = allOpticsScopeFamily !== 'all' ? ' \u2014 ' + allOpticsScopeFamily + ' only' : '';
+                                        const aoa = [
+                                            ['All Optics - Top ' + allOpticsTopN + familyLabel],
+                                            [allOpticsTop.length + ' items \u00b7 Data source: ' + sourceLabel],
+                                            [],
+                                            ['Rank', 'Item', 'Description', 'Family', 'Shipped Qty', 'Unshipped Qty', 'Total Qty'],
+                                            ...allOpticsTop.map((p, i) => [i + 1, p.item, p.description, p.family, p.shippedQty, p.unshippedQty, p.totalQty]),
+                                        ];
+                                        const ws = XLSX.utils.aoa_to_sheet(aoa);
+                                        ws['!cols'] = [{ wch: 6 }, { wch: 14 }, { wch: 40 }, { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 12 }];
+                                        const wb = XLSX.utils.book_new();
+                                        XLSX.utils.book_append_sheet(wb, ws, 'All Optics');
+                                        XLSX.writeFile(wb, 'All_Optics_Top' + allOpticsTopN + '.xlsx');
+                                    };
+
+                                    // === Export: any Scope Family section (ATACR, NX8, NX6, SHV, NXS, NF) to Excel ===
+                                    const exportFamilyXLSX = (familyKey, familyLabel) => {
+                                        const rows = topProductsByFamily[familyKey] || [];
+                                        const aoa = [
+                                            [familyLabel + ' - Top 20'],
+                                            [rows.length + ' products'],
+                                            [],
+                                            ['Rank', 'National Rank', 'Item', 'Description', 'Qty', 'Customers', 'Repeat %'],
+                                            ...rows.map((p, i) => [i + 1, p.nationalRank ? ('#' + p.nationalRank) : 'N/A', p.item, p.description, p.qty, p.customers, p.repeatRate.toFixed(0) + '%']),
+                                        ];
+                                        const ws = XLSX.utils.aoa_to_sheet(aoa);
+                                        ws['!cols'] = [{ wch: 6 }, { wch: 14 }, { wch: 14 }, { wch: 40 }, { wch: 10 }, { wch: 12 }, { wch: 10 }];
+                                        const wb = XLSX.utils.book_new();
+                                        XLSX.utils.book_append_sheet(wb, ws, familyLabel.replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 31));
+                                        const safe = familyLabel.replace(/[^a-z0-9]+/gi, '_').slice(0, 40);
+                                        XLSX.writeFile(wb, safe + '_Top20.xlsx');
+                                    };
+
                                     return (
                                         <>
                                             {/* All Optics Top 50/100 Section */}
-                                            <div className="no-print" style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '30px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: '1px solid #ddd' }}>
-                                                <h2 style={{ marginTop: 0, marginBottom: '20px', color: '#333', fontSize: '24px', fontWeight: 'bold' }}>All Optics - Top {allOpticsTopN}</h2>
+                                            <div id="all-optics-section" className="print-card" style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '30px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: '1px solid #ddd' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '20px' }}>
+                                                    <h2 style={{ margin: 0, color: '#333', fontSize: '24px', fontWeight: 'bold' }}>All Optics - Top {allOpticsTopN}</h2>
+                                                    <div className="no-print" style={{ display: 'flex', gap: '10px' }}>
+                                                        <button onClick={() => printSection('all-optics-section')} style={{ padding: '8px 16px', backgroundColor: '#238b48', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>Print to PDF</button>
+                                                        <button onClick={exportAllOpticsXLSX} style={{ padding: '8px 16px', backgroundColor: '#1a7a3c', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>Download Excel</button>
+                                                    </div>
+                                                </div>
                                                 
                                                 {/* Filters for All Optics Section */}
-                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginBottom: '20px', padding: '15px', backgroundColor: '#e8f4f8', borderRadius: '6px' }}>
+                                                <div className="no-print" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginBottom: '20px', padding: '15px', backgroundColor: '#e8f4f8', borderRadius: '6px' }}>
                                                     <div>
                                                         <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px', color: '#333' }}>
                                                             Show Top:
@@ -4500,8 +4390,14 @@ const top20Accessories = useMemo(() => {
                                             </div>
 
                                             {/* ATACR Family */}
-                                            <div className="no-print" style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: '1px solid #ddd' }}>
-                                                <h2 style={{ marginTop: 0, marginBottom: '15px', color: '#333', fontSize: '22px', fontWeight: 'bold' }}>ATACR Family - Top 20</h2>
+                                            <div id="atacr-family-section" className="print-card" style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: '1px solid #ddd' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '15px' }}>
+                                                    <h2 style={{ margin: 0, color: '#333', fontSize: '22px', fontWeight: 'bold' }}>ATACR Family - Top 20</h2>
+                                                    <div className="no-print" style={{ display: 'flex', gap: '10px' }}>
+                                                        <button onClick={() => printSection('atacr-family-section')} style={{ padding: '8px 16px', backgroundColor: '#238b48', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>Print to PDF</button>
+                                                        <button onClick={() => exportFamilyXLSX('ATACR', 'ATACR Family')} style={{ padding: '8px 16px', backgroundColor: '#1a7a3c', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>Download Excel</button>
+                                                    </div>
+                                                </div>
                                                 <div className="detail-table-container" style={{ maxHeight: '600px', overflowY: 'auto' }}>
                                                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                                         <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f5f5f5' }}>
@@ -4543,8 +4439,14 @@ const top20Accessories = useMemo(() => {
                                             </div>
 
                                             {/* NX8 Family */}
-                                            <div className="no-print" style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: '1px solid #ddd' }}>
-                                                <h2 style={{ marginTop: 0, marginBottom: '15px', color: '#333', fontSize: '22px', fontWeight: 'bold' }}>NX8 Family - Top 20</h2>
+                                            <div id="nx8-family-section" className="print-card" style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: '1px solid #ddd' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '15px' }}>
+                                                    <h2 style={{ margin: 0, color: '#333', fontSize: '22px', fontWeight: 'bold' }}>NX8 Family - Top 20</h2>
+                                                    <div className="no-print" style={{ display: 'flex', gap: '10px' }}>
+                                                        <button onClick={() => printSection('nx8-family-section')} style={{ padding: '8px 16px', backgroundColor: '#238b48', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>Print to PDF</button>
+                                                        <button onClick={() => exportFamilyXLSX('NX8', 'NX8 Family')} style={{ padding: '8px 16px', backgroundColor: '#1a7a3c', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>Download Excel</button>
+                                                    </div>
+                                                </div>
                                                 <div className="detail-table-container" style={{ maxHeight: '600px', overflowY: 'auto' }}>
                                                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                                         <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f5f5f5' }}>
@@ -4586,8 +4488,14 @@ const top20Accessories = useMemo(() => {
                                             </div>
 
                                             {/* NX6 Family */}
-                                            <div className="no-print" style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: '1px solid #ddd' }}>
-                                                <h2 style={{ marginTop: 0, marginBottom: '15px', color: '#333', fontSize: '22px', fontWeight: 'bold' }}>NX6 Family - Top 20</h2>
+                                            <div id="nx6-family-section" className="print-card" style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: '1px solid #ddd' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '15px' }}>
+                                                    <h2 style={{ margin: 0, color: '#333', fontSize: '22px', fontWeight: 'bold' }}>NX6 Family - Top 20</h2>
+                                                    <div className="no-print" style={{ display: 'flex', gap: '10px' }}>
+                                                        <button onClick={() => printSection('nx6-family-section')} style={{ padding: '8px 16px', backgroundColor: '#238b48', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>Print to PDF</button>
+                                                        <button onClick={() => exportFamilyXLSX('NX6', 'NX6 Family')} style={{ padding: '8px 16px', backgroundColor: '#1a7a3c', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>Download Excel</button>
+                                                    </div>
+                                                </div>
                                                 <div className="detail-table-container" style={{ maxHeight: '600px', overflowY: 'auto' }}>
                                                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                                         <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f5f5f5' }}>
@@ -4629,8 +4537,14 @@ const top20Accessories = useMemo(() => {
                                             </div>
 
                                             {/* SHV Family */}
-                                            <div className="no-print" style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: '1px solid #ddd' }}>
-                                                <h2 style={{ marginTop: 0, marginBottom: '15px', color: '#333', fontSize: '22px', fontWeight: 'bold' }}>SHV Family - Top 20</h2>
+                                            <div id="shv-family-section" className="print-card" style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: '1px solid #ddd' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '15px' }}>
+                                                    <h2 style={{ margin: 0, color: '#333', fontSize: '22px', fontWeight: 'bold' }}>SHV Family - Top 20</h2>
+                                                    <div className="no-print" style={{ display: 'flex', gap: '10px' }}>
+                                                        <button onClick={() => printSection('shv-family-section')} style={{ padding: '8px 16px', backgroundColor: '#238b48', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>Print to PDF</button>
+                                                        <button onClick={() => exportFamilyXLSX('SHV', 'SHV Family')} style={{ padding: '8px 16px', backgroundColor: '#1a7a3c', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>Download Excel</button>
+                                                    </div>
+                                                </div>
                                                 <div className="detail-table-container" style={{ maxHeight: '600px', overflowY: 'auto' }}>
                                                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                                         <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f5f5f5' }}>
@@ -4672,8 +4586,14 @@ const top20Accessories = useMemo(() => {
                                             </div>
 
                                             {/* NXS Family */}
-                                            <div className="no-print" style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: '1px solid #ddd' }}>
-                                                <h2 style={{ marginTop: 0, marginBottom: '15px', color: '#333', fontSize: '22px', fontWeight: 'bold' }}>NXS Family - Top 20</h2>
+                                            <div id="nxs-family-section" className="print-card" style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: '1px solid #ddd' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '15px' }}>
+                                                    <h2 style={{ margin: 0, color: '#333', fontSize: '22px', fontWeight: 'bold' }}>NXS Family - Top 20</h2>
+                                                    <div className="no-print" style={{ display: 'flex', gap: '10px' }}>
+                                                        <button onClick={() => printSection('nxs-family-section')} style={{ padding: '8px 16px', backgroundColor: '#238b48', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>Print to PDF</button>
+                                                        <button onClick={() => exportFamilyXLSX('NXS', 'NXS Family')} style={{ padding: '8px 16px', backgroundColor: '#1a7a3c', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>Download Excel</button>
+                                                    </div>
+                                                </div>
                                                 <div className="detail-table-container" style={{ maxHeight: '600px', overflowY: 'auto' }}>
                                                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                                         <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f5f5f5' }}>
@@ -4715,8 +4635,14 @@ const top20Accessories = useMemo(() => {
                                             </div>
 
                                             {/* NF Family (Competition + Other) */}
-                                            <div className="no-print" style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: '1px solid #ddd' }}>
-                                                <h2 style={{ marginTop: 0, marginBottom: '15px', color: '#333', fontSize: '22px', fontWeight: 'bold' }}>NF Family (Competition + Other) - Top 20</h2>
+                                            <div id="nf-family-section" className="print-card" style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: '1px solid #ddd' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '15px' }}>
+                                                    <h2 style={{ margin: 0, color: '#333', fontSize: '22px', fontWeight: 'bold' }}>NF Family (Competition + Other) - Top 20</h2>
+                                                    <div className="no-print" style={{ display: 'flex', gap: '10px' }}>
+                                                        <button onClick={() => printSection('nf-family-section')} style={{ padding: '8px 16px', backgroundColor: '#238b48', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>Print to PDF</button>
+                                                        <button onClick={() => exportFamilyXLSX('NF', 'NF Family')} style={{ padding: '8px 16px', backgroundColor: '#1a7a3c', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>Download Excel</button>
+                                                    </div>
+                                                </div>
                                                 <div className="detail-table-container" style={{ maxHeight: '600px', overflowY: 'auto' }}>
                                                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                                         <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f5f5f5' }}>
