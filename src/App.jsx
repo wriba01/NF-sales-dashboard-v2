@@ -25,6 +25,39 @@ import * as XLSX from 'xlsx';
         // Professional color scheme designed by William A Riba (WAR) for NFO Sales Analytics
         const COLORS = ['#23668b', '#238b48', '#8b6623', '#8b2366', '#668b23', '#66238b', '#8b4823', '#48238b'];
 
+        // === Fiscal Year support ===
+        // Nightforce's fiscal year runs July 1 - June 30, and is labeled by the
+        // calendar year it ENDS in (e.g. Jul 2025-Jun 2026 = "FY26"). Since the
+        // ending-year label is a plain integer, all existing "year - 1 = previous
+        // year" arithmetic elsewhere in this file keeps working unchanged in
+        // fiscal mode — only the extraction of "which year does this date belong
+        // to" needs to change.
+        const FISCAL_START_MONTH = 6; // July, 0-indexed
+
+        function getFiscalYear(date) {
+            const m = date.getMonth();
+            const y = date.getFullYear();
+            return m >= FISCAL_START_MONTH ? y + 1 : y;
+        }
+
+        // Returns the "period year" a date belongs to, given the active year mode.
+        function getPeriodYear(date, yearMode) {
+            return yearMode === 'fiscal' ? getFiscalYear(date) : date.getFullYear();
+        }
+
+        // Fiscal-relative month index: July = 0 ... June = 11. Used to sort the
+        // Monthly Trend chart's x-axis into fiscal order instead of Jan-Dec.
+        function getFiscalMonthIndex(calendarMonthIndex) {
+            return (calendarMonthIndex - FISCAL_START_MONTH + 12) % 12;
+        }
+
+        // Formats a period-year integer for display: "2026" in calendar mode,
+        // "FY26" in fiscal mode.
+        function formatPeriodLabel(year, yearMode) {
+            if (year === 'all') return 'All Years';
+            return yearMode === 'fiscal' ? `FY${String(year).slice(-2)}` : String(year);
+        }
+
 
         // CONFIGURATION
         // System designed and developed by William A Riba - 2025
@@ -107,7 +140,7 @@ import * as XLSX from 'xlsx';
             return <canvas ref={chartRef}></canvas>;
         });
 
-        const SimpleBarChart = React.memo(({ data, yearsWithData }) => {
+        const SimpleBarChart = React.memo(({ data, yearsWithData, yearMode }) => {
             const chartRef = useRef(null);
             const chartInstance = useRef(null);
 
@@ -122,7 +155,7 @@ import * as XLSX from 'xlsx';
 
                 // Only show datasets for years that have data
                 const datasets = yearsWithData.map((year, index) => ({
-                    label: year.toString(),
+                    label: formatPeriodLabel(year, yearMode),
                     data: data.map(item => item[year] || 0),
                     backgroundColor: COLORS[index % COLORS.length],
                     borderColor: COLORS[index % COLORS.length],
@@ -173,7 +206,7 @@ import * as XLSX from 'xlsx';
                         chartInstance.current.destroy();
                     }
                 };
-            }, [data, yearsWithData]);
+            }, [data, yearsWithData, yearMode]);
 
             return <canvas ref={chartRef}></canvas>;
         });
@@ -252,7 +285,7 @@ import * as XLSX from 'xlsx';
             return <canvas ref={chartRef}></canvas>;
         });
 
-        const AnnualBarChart = React.memo(({ data }) => {
+        const AnnualBarChart = React.memo(({ data, yearMode }) => {
             const chartRef = useRef(null);
             const chartInstance = useRef(null);
 
@@ -268,7 +301,7 @@ import * as XLSX from 'xlsx';
                 chartInstance.current = new Chart(ctx, {
                     type: 'bar',
                     data: {
-                        labels: data.map(item => item.year.toString()),
+                        labels: data.map(item => formatPeriodLabel(item.year, yearMode)),
                         datasets: [{
                             label: 'Annual Revenue',
                             data: data.map(item => item.revenue),
@@ -333,7 +366,7 @@ import * as XLSX from 'xlsx';
                         chartInstance.current.destroy();
                     }
                 };
-            }, [data]);
+            }, [data, yearMode]);
 
             return <canvas ref={chartRef}></canvas>;
         });
@@ -712,6 +745,7 @@ import * as XLSX from 'xlsx';
             const [selectedAccountManager, setSelectedAccountManager] = useState('all');
             const [selectedHGRep, setSelectedHGRep] = useState('all');
             const [selectedYear, setSelectedYear] = useState('all');
+            const [yearMode, setYearMode] = useState('calendar'); // 'calendar' | 'fiscal' (Jul-Jun, labeled by ending year)
             const [selectedTerritory, setSelectedTerritory] = useState('all');
             const [selectedClassification, setSelectedClassification] = useState('all');
             const [selectedBuyGroup, setSelectedBuyGroup] = useState('all');
@@ -730,6 +764,14 @@ import * as XLSX from 'xlsx';
             const [allOpticsScopeFamily, setAllOpticsScopeFamily] = useState('all'); // 'all', 'ATACR', 'NX8', 'NX6', 'SHV', 'NXS', 'NF'
             const [hiddenQtrYears, setHiddenQtrYears] = useState(new Set()); // years toggled off in quarterly chart legend
             const [allOpticsDataSource, setAllOpticsDataSource] = useState('both'); // 'shipped', 'unshipped', 'both'
+
+            // Switching Calendar/Fiscal resets the specific Year selection back to
+            // "All Years" — a selected year number means a different date range in
+            // each mode, so carrying it over silently would filter on the wrong window.
+            const handleYearModeChange = (mode) => {
+                setYearMode(mode);
+                setSelectedYear('all');
+            };
 
             useEffect(() => {
                 const auth = sessionStorage.getItem('dashboard_auth');
@@ -1054,7 +1096,7 @@ import * as XLSX from 'xlsx';
                     const yearNum = parseInt(selectedYear);
                     data = data.filter(row => {
                         if (!row.shipDateParsed) return false;
-                        return row.shipDateParsed.getFullYear() === yearNum;
+                        return getPeriodYear(row.shipDateParsed, yearMode) === yearNum;
                     });
                 }
                 
@@ -1080,7 +1122,7 @@ import * as XLSX from 'xlsx';
                 }
                 
                 return data;
-            }, [rawData, selectedAccountManager, selectedHGRep, selectedTerritory, selectedYear, selectedClassification, selectedBuyGroup, selectedCustomer]);
+            }, [rawData, selectedAccountManager, selectedHGRep, selectedTerritory, selectedYear, yearMode, selectedClassification, selectedBuyGroup, selectedCustomer]);
 
             // Filtered data excluding Year filter (for Annual YoY chart)
             const filteredDataExcludingYear = useMemo(() => {
@@ -1252,11 +1294,11 @@ import * as XLSX from 'xlsx';
                 const unique = new Set();
                 rawData.forEach(row => {
                     if (row.shipDateParsed) {
-                        unique.add(row.shipDateParsed.getFullYear());
+                        unique.add(getPeriodYear(row.shipDateParsed, yearMode));
                     }
                 });
                 return ['all', ...Array.from(unique).sort((a, b) => b - a)]; // Sort descending
-            }, [rawData]);
+            }, [rawData, yearMode]);
 
             const territories = ['all', 'East', 'West', 'Central'];
             
@@ -1318,23 +1360,24 @@ import * as XLSX from 'xlsx';
 
             const monthlyYoYData = useMemo(() => {
                 const monthlyData = {};
-                const currentYear = new Date().getFullYear();
-                const startYear = currentYear - 5;
+                const currentPeriodYear = getPeriodYear(new Date(), yearMode);
+                const startYear = currentPeriodYear - 5;
 
                 filteredData.forEach(row => {
                     if (!row.shipDateParsed) return;
                     
                     const date = row.shipDateParsed;
-                    const year = date.getFullYear();
+                    const year = getPeriodYear(date, yearMode);
                     const month = date.getMonth();
 
-                    if (year < startYear || year > currentYear) return;
+                    if (year < startYear || year > currentPeriodYear) return;
 
                     const monthName = new Date(2000, month).toLocaleString('en-US', { month: 'short' });
+                    const sortIndex = yearMode === 'fiscal' ? getFiscalMonthIndex(month) : month;
                     
                     if (!monthlyData[monthName]) {
-                        monthlyData[monthName] = { month: monthName, monthIndex: month };
-                        for (let y = startYear; y <= currentYear; y++) {
+                        monthlyData[monthName] = { month: monthName, monthIndex: sortIndex };
+                        for (let y = startYear; y <= currentPeriodYear; y++) {
                             monthlyData[monthName][y] = 0;
                         }
                     }
@@ -1343,7 +1386,7 @@ import * as XLSX from 'xlsx';
                 });
 
                 return Object.values(monthlyData).sort((a, b) => a.monthIndex - b.monthIndex);
-            }, [filteredData]);
+            }, [filteredData, yearMode]);
 
             // Annual YoY data for simple year comparison (uses all filters EXCEPT year)
             const annualYoYData = useMemo(() => {
@@ -1352,7 +1395,7 @@ import * as XLSX from 'xlsx';
                 filteredDataExcludingYear.forEach(row => {
                     if (!row.shipDateParsed) return;
                     
-                    const year = row.shipDateParsed.getFullYear();
+                    const year = getPeriodYear(row.shipDateParsed, yearMode);
                     
                     if (!yearData[year]) {
                         yearData[year] = 0;
@@ -1365,18 +1408,18 @@ import * as XLSX from 'xlsx';
                 return Object.entries(yearData)
                     .map(([year, revenue]) => ({ year: parseInt(year), revenue }))
                     .sort((a, b) => a.year - b.year);
-            }, [filteredDataExcludingYear]);
+            }, [filteredDataExcludingYear, yearMode]);
 
             // Get only years that have actual data
             const yearsWithData = useMemo(() => {
                 const uniqueYears = new Set();
                 filteredData.forEach(row => {
                     if (row.shipDateParsed) {
-                        uniqueYears.add(row.shipDateParsed.getFullYear());
+                        uniqueYears.add(getPeriodYear(row.shipDateParsed, yearMode));
                     }
                 });
                 return Array.from(uniqueYears).sort();
-            }, [filteredData]);
+            }, [filteredData, yearMode]);
 
             const revenueByAccountManager = useMemo(() => {
                 const grouped = {};
@@ -1506,9 +1549,9 @@ import * as XLSX from 'xlsx';
                 const yearNum = parseInt(selectedYear);
                 return rawData.filter(row => {
                     if (!row.shipDateParsed) return false;
-                    return row.shipDateParsed.getFullYear() === yearNum;
+                    return getPeriodYear(row.shipDateParsed, yearMode) === yearNum;
                 });
-            }, [rawData, selectedYear]);
+            }, [rawData, selectedYear, yearMode]);
 
             // National Optics vs Accessories
             const nationalRevenueByProductType = useMemo(() => {
@@ -1660,7 +1703,7 @@ const top20Accessories = useMemo(() => {
                 
                 filteredData.forEach(row => {
                     if (!row.shipDateParsed) return;
-                    const year = row.shipDateParsed.getFullYear();
+                    const year = getPeriodYear(row.shipDateParsed, yearMode);
                     if (!yearlyRevenue[year]) {
                         yearlyRevenue[year] = 0;
                     }
@@ -1686,7 +1729,7 @@ const top20Accessories = useMemo(() => {
                 }
 
                 return growthData;
-            }, [filteredData]);
+            }, [filteredData, yearMode]);
 
             // Total Number of Accounts
             const totalAccounts = useMemo(() => {
@@ -1716,7 +1759,7 @@ const top20Accessories = useMemo(() => {
             const customerActivityStatus = useMemo(() => {
                 const customers = {};
                 const today = new Date();
-                const currentYear = new Date().getFullYear();
+                const currentYear = getPeriodYear(new Date(), yearMode);
                 
                 // Filter unshipped data with same filters as shipped (except year)
                 let filteredUnshippedForActivity = unshippedData;
@@ -1764,7 +1807,7 @@ const top20Accessories = useMemo(() => {
                     customers[customer].totalRevenue += row.revenue;
                     
                     // Track YTD revenue (current year only)
-                    if (row.shipDateParsed && row.shipDateParsed.getFullYear() === currentYear) {
+                    if (row.shipDateParsed && getPeriodYear(row.shipDateParsed, yearMode) === currentYear) {
                         customers[customer].ytdRevenue += row.revenue;
                     }
                     
@@ -1863,7 +1906,7 @@ const top20Accessories = useMemo(() => {
                     atRisk: { customers: atRisk, ...calcTotals(atRisk) },
                     inactive: { customers: inactive, ...calcTotals(inactive) }
                 };
-            }, [consolidatedMetrics, unshippedData, selectedAccountManager, selectedHGRep, selectedTerritory, selectedClassification, selectedBuyGroup, selectedCustomer]);
+            }, [consolidatedMetrics, unshippedData, selectedAccountManager, selectedHGRep, selectedTerritory, selectedClassification, selectedBuyGroup, selectedCustomer, yearMode]);
 
             // Customer Activity Distribution (for pie chart)
             const customerActivityDistribution = useMemo(() => {
@@ -2277,6 +2320,27 @@ const top20Accessories = useMemo(() => {
                                             </select>
                                         </div>
 
+                                        {/* Year Type Toggle */}
+                                        <div>
+                                            <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>
+                                                Year Type:
+                                            </label>
+                                            <div style={{ display: 'flex', gap: '8px' }}>
+                                                <button
+                                                    onClick={() => handleYearModeChange('calendar')}
+                                                    style={{ flex: 1, padding: '8px 12px', fontSize: '14px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: yearMode === 'calendar' ? '#23668b' : '#ddd', color: yearMode === 'calendar' ? '#fff' : '#333' }}
+                                                >
+                                                    Calendar
+                                                </button>
+                                                <button
+                                                    onClick={() => handleYearModeChange('fiscal')}
+                                                    style={{ flex: 1, padding: '8px 12px', fontSize: '14px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: yearMode === 'fiscal' ? '#23668b' : '#ddd', color: yearMode === 'fiscal' ? '#fff' : '#333' }}
+                                                >
+                                                    Fiscal (Jul-Jun)
+                                                </button>
+                                            </div>
+                                        </div>
+
                                         {/* Year Filter */}
                                         <div>
                                             <label style={{ fontWeight: 'bold', marginRight: '10px', display: 'block', marginBottom: '8px' }}>
@@ -2289,7 +2353,7 @@ const top20Accessories = useMemo(() => {
                                             >
                                                 {years.map(year => (
                                                     <option key={year} value={year}>
-                                                        {year === 'all' ? 'All Years' : year}
+                                                        {formatPeriodLabel(year, yearMode)}
                                                     </option>
                                                 ))}
                                             </select>
@@ -2361,14 +2425,14 @@ const top20Accessories = useMemo(() => {
                                 <div className="print-card" style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '30px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: '1px solid #ddd' }}>
                                     <h2 style={{ marginTop: 0, marginBottom: '20px' }}>Annual Shipped - Year Over Year</h2>
                                     <div className="chart-container">
-                                        <AnnualBarChart data={annualYoYData} />
+                                        <AnnualBarChart data={annualYoYData} yearMode={yearMode} />
                                     </div>
                                 </div>
 
                                 <div className="print-card" style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '30px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: '1px solid #ddd' }}>
                                     <h2 style={{ marginTop: 0, marginBottom: '20px' }}>Monthly Shipped Breakdown</h2>
                                     <div className="chart-container">
-                                        <SimpleBarChart data={monthlyYoYData} yearsWithData={yearsWithData} />
+                                        <SimpleBarChart data={monthlyYoYData} yearsWithData={yearsWithData} yearMode={yearMode} />
                                     </div>
                                 </div>
 
@@ -2685,6 +2749,28 @@ const top20Accessories = useMemo(() => {
                                                 ))}
                                             </select>
                                         </div>
+                                        {/* Year Type Toggle */}
+                                        <div>
+                                            <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>
+                                                Year Type:
+                                            </label>
+                                            <div style={{ display: 'flex', gap: '8px' }}>
+                                                <button
+                                                    onClick={() => handleYearModeChange('calendar')}
+                                                    style={{ flex: 1, padding: '8px 12px', fontSize: '14px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: yearMode === 'calendar' ? '#23668b' : '#ddd', color: yearMode === 'calendar' ? '#fff' : '#333' }}
+                                                >
+                                                    Calendar
+                                                </button>
+                                                <button
+                                                    onClick={() => handleYearModeChange('fiscal')}
+                                                    style={{ flex: 1, padding: '8px 12px', fontSize: '14px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: yearMode === 'fiscal' ? '#23668b' : '#ddd', color: yearMode === 'fiscal' ? '#fff' : '#333' }}
+                                                >
+                                                    Fiscal (Jul-Jun)
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Year Filter */}
                                         <div>
                                             <label style={{ fontWeight: 'bold', marginRight: '10px', display: 'block', marginBottom: '8px' }}>
                                                 Year:
@@ -2696,7 +2782,7 @@ const top20Accessories = useMemo(() => {
                                             >
                                                 {years.map(year => (
                                                     <option key={year} value={year}>
-                                                        {year === 'all' ? 'All Years' : year}
+                                                        {formatPeriodLabel(year, yearMode)}
                                                     </option>
                                                 ))}
                                             </select>
@@ -3098,6 +3184,28 @@ const top20Accessories = useMemo(() => {
                                                 ))}
                                             </select>
                                         </div>
+                                        {/* Year Type Toggle */}
+                                        <div>
+                                            <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>
+                                                Year Type:
+                                            </label>
+                                            <div style={{ display: 'flex', gap: '8px' }}>
+                                                <button
+                                                    onClick={() => handleYearModeChange('calendar')}
+                                                    style={{ flex: 1, padding: '8px 12px', fontSize: '14px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: yearMode === 'calendar' ? '#23668b' : '#ddd', color: yearMode === 'calendar' ? '#fff' : '#333' }}
+                                                >
+                                                    Calendar
+                                                </button>
+                                                <button
+                                                    onClick={() => handleYearModeChange('fiscal')}
+                                                    style={{ flex: 1, padding: '8px 12px', fontSize: '14px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: yearMode === 'fiscal' ? '#23668b' : '#ddd', color: yearMode === 'fiscal' ? '#fff' : '#333' }}
+                                                >
+                                                    Fiscal (Jul-Jun)
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Year Filter */}
                                         <div>
                                             <label style={{ fontWeight: 'bold', marginRight: '10px', display: 'block', marginBottom: '8px' }}>
                                                 Year:
@@ -3109,7 +3217,7 @@ const top20Accessories = useMemo(() => {
                                             >
                                                 {years.map(year => (
                                                     <option key={year} value={year}>
-                                                        {year === 'all' ? 'All Years' : year}
+                                                        {formatPeriodLabel(year, yearMode)}
                                                     </option>
                                                 ))}
                                             </select>
@@ -3294,6 +3402,28 @@ const top20Accessories = useMemo(() => {
                                                 ))}
                                             </select>
                                         </div>
+                                        {/* Year Type Toggle */}
+                                        <div>
+                                            <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>
+                                                Year Type:
+                                            </label>
+                                            <div style={{ display: 'flex', gap: '8px' }}>
+                                                <button
+                                                    onClick={() => handleYearModeChange('calendar')}
+                                                    style={{ flex: 1, padding: '8px 12px', fontSize: '14px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: yearMode === 'calendar' ? '#23668b' : '#ddd', color: yearMode === 'calendar' ? '#fff' : '#333' }}
+                                                >
+                                                    Calendar
+                                                </button>
+                                                <button
+                                                    onClick={() => handleYearModeChange('fiscal')}
+                                                    style={{ flex: 1, padding: '8px 12px', fontSize: '14px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: yearMode === 'fiscal' ? '#23668b' : '#ddd', color: yearMode === 'fiscal' ? '#fff' : '#333' }}
+                                                >
+                                                    Fiscal (Jul-Jun)
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Year Filter */}
                                         <div>
                                             <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px', color: '#333' }}>
                                                 Year:
@@ -3305,7 +3435,7 @@ const top20Accessories = useMemo(() => {
                                             >
                                                 {years.map(year => (
                                                     <option key={year} value={year}>
-                                                        {year === 'all' ? 'All Years' : year}
+                                                        {formatPeriodLabel(year, yearMode)}
                                                     </option>
                                                 ))}
                                             </select>
@@ -3404,7 +3534,7 @@ const top20Accessories = useMemo(() => {
                                         filteredData.forEach(row => {
                                             if (!row.shipDateParsed) return;
                                             
-                                            const year = row.shipDateParsed.getFullYear();
+                                            const year = getPeriodYear(row.shipDateParsed, yearMode);
                                             const group = getBuyGroupLabel(row.buyGroup);
                                             
                                             // Skip Non-Buy Group if toggle is off
@@ -3444,7 +3574,7 @@ const top20Accessories = useMemo(() => {
                                         const currentYearData = {};
                                         const previousYearData = {};
                                         
-                                        const currentYear = selectedYear === 'all' ? new Date().getFullYear() : parseInt(selectedYear);
+                                        const currentYear = selectedYear === 'all' ? getPeriodYear(new Date(), yearMode) : parseInt(selectedYear);
                                         const previousYear = currentYear - 1;
                                         
                                         // Use rawData and manually apply all filters EXCEPT year
@@ -3458,7 +3588,7 @@ const top20Accessories = useMemo(() => {
                                             if (selectedClassification !== 'all' && row.classification !== selectedClassification) return;
                                             if (selectedCustomer !== 'all' && row.customer !== selectedCustomer) return;
                                             
-                                            const year = row.shipDateParsed.getFullYear();
+                                            const year = getPeriodYear(row.shipDateParsed, yearMode);
                                             const group = getBuyGroupLabel(row.buyGroup);
                                             
                                             // Apply Buy Group filter
@@ -3543,7 +3673,7 @@ const top20Accessories = useMemo(() => {
                                         if (selectedYear === 'all') {
                                             // Cumulative new accounts across all years
                                             const allNewAccounts = { NBS: new Set(), 'Sports Inc': new Set(), 'Non-Buy Group': new Set() };
-                                            const allYears = [...new Set(rawData.filter(r => r.shipDateParsed && matchesNonYearFilters(r)).map(r => r.shipDateParsed.getFullYear()))].sort();
+                                            const allYears = [...new Set(rawData.filter(r => r.shipDateParsed && matchesNonYearFilters(r)).map(r => getPeriodYear(r.shipDateParsed, yearMode)))].sort();
                                             
                                             allYears.forEach((year, index) => {
                                                 if (index === 0) return; // Skip first year
@@ -3554,7 +3684,7 @@ const top20Accessories = useMemo(() => {
                                                 
                                                 rawData.forEach(row => {
                                                     if (!row.shipDateParsed || !row.customer || !matchesNonYearFilters(row)) return;
-                                                    const rowYear = row.shipDateParsed.getFullYear();
+                                                    const rowYear = getPeriodYear(row.shipDateParsed, yearMode);
                                                     const group = getBuyGroupLabel(row.buyGroup);
                                                     
                                                     if (rowYear === year) {
@@ -3592,7 +3722,7 @@ const top20Accessories = useMemo(() => {
                                             
                                             rawData.forEach(row => {
                                                 if (!row.shipDateParsed || !row.customer || !matchesNonYearFilters(row)) return;
-                                                const rowYear = row.shipDateParsed.getFullYear();
+                                                const rowYear = getPeriodYear(row.shipDateParsed, yearMode);
                                                 const group = getBuyGroupLabel(row.buyGroup);
                                                 
                                                 if (rowYear === currentYear) {
@@ -3778,6 +3908,28 @@ const top20Accessories = useMemo(() => {
                                                 ))}
                                             </select>
                                         </div>
+                                        {/* Year Type Toggle */}
+                                        <div>
+                                            <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>
+                                                Year Type:
+                                            </label>
+                                            <div style={{ display: 'flex', gap: '8px' }}>
+                                                <button
+                                                    onClick={() => handleYearModeChange('calendar')}
+                                                    style={{ flex: 1, padding: '8px 12px', fontSize: '14px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: yearMode === 'calendar' ? '#23668b' : '#ddd', color: yearMode === 'calendar' ? '#fff' : '#333' }}
+                                                >
+                                                    Calendar
+                                                </button>
+                                                <button
+                                                    onClick={() => handleYearModeChange('fiscal')}
+                                                    style={{ flex: 1, padding: '8px 12px', fontSize: '14px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', backgroundColor: yearMode === 'fiscal' ? '#23668b' : '#ddd', color: yearMode === 'fiscal' ? '#fff' : '#333' }}
+                                                >
+                                                    Fiscal (Jul-Jun)
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Year Filter */}
                                         <div>
                                             <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px', color: '#333' }}>
                                                 Year:
@@ -3789,7 +3941,7 @@ const top20Accessories = useMemo(() => {
                                             >
                                                 {years.map(year => (
                                                     <option key={year} value={year}>
-                                                        {year === 'all' ? 'All Years' : year}
+                                                        {formatPeriodLabel(year, yearMode)}
                                                     </option>
                                                 ))}
                                             </select>
@@ -4019,7 +4171,7 @@ const top20Accessories = useMemo(() => {
                                                 const yearNum = parseInt(selectedYear);
                                                 filteredUnshipped = filteredUnshipped.filter(row => {
                                                     if (!row.scheduledShipDateParsed) return false;
-                                                    return row.scheduledShipDateParsed.getFullYear() === yearNum;
+                                                    return getPeriodYear(row.scheduledShipDateParsed, yearMode) === yearNum;
                                                 });
                                             }
                                             if (selectedClassification !== 'all') {
@@ -4090,7 +4242,7 @@ const top20Accessories = useMemo(() => {
                                             const yearNum = parseInt(selectedYear);
                                             nationalFilteredData = nationalFilteredData.filter(row => {
                                                 if (!row.shipDateParsed) return false;
-                                                return row.shipDateParsed.getFullYear() === yearNum;
+                                                return getPeriodYear(row.shipDateParsed, yearMode) === yearNum;
                                             });
                                         }
                                         
@@ -4149,7 +4301,7 @@ const top20Accessories = useMemo(() => {
                                         };
                                         
                                         // Get current year and previous year for YoY calculation
-                                        const allYears = [...new Set(rawData.filter(r => r.shipDateParsed).map(r => r.shipDateParsed.getFullYear()))].sort();
+                                        const allYears = [...new Set(rawData.filter(r => r.shipDateParsed).map(r => getPeriodYear(r.shipDateParsed, yearMode)))].sort();
                                         const latestYear = allYears[allYears.length - 1];
                                         const previousYear = latestYear - 1;
                                         
@@ -4195,7 +4347,7 @@ const top20Accessories = useMemo(() => {
                                             if (!family || !families[family][row.item]) return;
                                             
                                             if (!row.shipDateParsed) return;
-                                            const year = row.shipDateParsed.getFullYear();
+                                            const year = getPeriodYear(row.shipDateParsed, yearMode);
                                             
                                             if (year === latestYear) {
                                                 families[family][row.item].currentYearQty += row.qty;
