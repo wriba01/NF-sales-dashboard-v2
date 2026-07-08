@@ -922,7 +922,7 @@ import * as XLSX from 'xlsx';
                     const allShippedData = [];
                     
                     for (const sheetName of SHIPPED_SHEETS) {
-                        const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(sheetName)}?key=${GOOGLE_SHEETS_API_KEY}`;
+                        const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(sheetName)}?key=${API_KEY}`;
                         
                         const response = await fetch(url);
                         
