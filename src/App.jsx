@@ -61,7 +61,7 @@ import * as XLSX from 'xlsx';
 
         // CONFIGURATION
         // System designed and developed by William A Riba - 2025
-        const GOOGLE_SHEETS_API_KEY = 'AIzaSyB7XLcDlSI-8xo9c_WqIhaKvnV60axqyKA';
+        const API_KEY = import.meta.env.VITE_SHEETS_API_KEY;;
         const SHEET_ID = '1qJuW-Y_W6jzO-ACY6fWy4mPxiHxCKZhydY7pF8pO7M4';
         const SHIPPED_SHEETS = ['2023 Shipped', '2024-2025 Shipped', '2026 Shipped'];
         const UNSHIPPED_SHEET = 'Unshipped Report';
