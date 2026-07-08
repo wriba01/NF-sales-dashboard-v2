@@ -999,7 +999,7 @@ import * as XLSX from 'xlsx';
                     setRawData(allShippedData);
 
                     // Load Unshipped Report separately
-                    const unshippedUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(UNSHIPPED_SHEET)}?key=${GOOGLE_SHEETS_API_KEY}`;
+                    const unshippedUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(UNSHIPPED_SHEET)}?key=${API_KEY}`;
                     
                     try {
                         const unshippedResponse = await fetch(unshippedUrl);
